@@ -1,0 +1,221 @@
+---
+title: "SpatStat"
+format: gfm
+editor: source
+---
+
+```{r setup, include=FALSE}
+set.seed(02022025)
+library(spatstat)
+```
+
+This demo will explore point process features in the `spatstat` package. Note the spatstat "package" actually contains a set of R packages.
+
+For additional `spatstat` details run the following code `vignette('getstart')` in your R console.
+
+#### 1. Generate Point Process Data
+
+Note this will require both a $n$ and $\boldsymbol{s}$
+
+```{r}
+lambda <- 100
+n <- rpois(1, lambda)
+
+x <- rbeta(n, 1, 1)
+y <- rbeta(n, 1, 1)
+
+sim_pp <- ppp(x, y, window = owin(xrange = c(0,1), yrange = c(0,1)))
+plot(sim_pp, main = 'simulated huckleberry map')
+```
+
+There are also a collection of methods in spatstat to simulation random point process, see `rpoispp` or many others. These can more closely link to our assumed generative models when considering, for example trend surfaces or the inclusion of raster data.
+
+```{r}
+CSR <- rpoispp(100)
+plot(CSR)
+```
+
+
+__Activity 1:__ Generate a point process, where the intensity is a non-uniform function of x and y.
+
+```{r}
+pp <- rpoispp(lambda = function(x,y) { exp(4 * x + 3 *y)})
+plot(pp)
+```
+
+
+#### 2. Summarize Point Process
+
+```{r}
+summary(sim_pp)
+```
+
+```{r}
+summary(pp)
+```
+
+
+#### 3. Assess Spatial Structure - Does it exhibit CSP?
+
+Remember, the $F$ function corresponds to empty space and $G$ corresponds to nearest neighbor space. The $K$ function explores the number of points in a specified radius.
+
+```{r}
+plot(envelope(sim_pp,Fest, verbose = F))
+plot(envelope(sim_pp,Gest, verbose = F))
+plot(envelope(sim_pp,Kest, verbose = F))
+plot(envelope(CSR,Fest, verbose = F))
+plot(envelope(CSR,Gest, verbose = F))
+plot(envelope(CSR,Kest, verbose = F))
+
+```
+
+```{r}
+plot(envelope(pp,Fest, verbose = F))
+plot(envelope(pp,Gest, verbose = F))
+plot(envelope(pp,Kest, verbose = F))
+```
+
+_Q:_ Think about the interpretation when observed lines are above and/or below the gray curves.
+
+#### 4. How does surface differ from CSR? Smoothed density surfaces
+
+```{r}
+plot(density(sim_pp))
+plot(density(CSR))
+```
+
+```{r}
+plot(density(pp))
+
+```
+
+
+### Model Fitting
+
+The `ppm` function can be used for model fitting with a point process. Consider an example that uses the location of *Beilschmiedia pendula* rainforest trees.
+
+\vfill
+
+```{r}
+plot(bei)
+```
+
+\vfill
+
+The `bei` dataset contains locations of trees in a tropical rain forest. The point pattern is clearly non-homogenous
+
+\vfill
+```{r}
+plot(envelope(bei, Kest, verbose = F))
+plot(envelope(bei, Fest, verbose = F))
+plot(envelope(bei, Gest, verbose = F))
+
+plot(density.ppp(bei))
+```
+\vfill
+
+
+The pattern in the intensity of the trees may be related to elevation and the elevation gradient.
+
+\vfill
+```{r}
+elev <- bei.extra$elev
+grad <- bei.extra$grad
+plot(elev)
+plot(grad)
+```
+
+\newpage
+
+The `ppm` function allows model fitting
+\vfill
+```{r}
+tree.model <- ppm(bei ~ elev + grad);
+tree.model
+plot(tree.model)
+```
+\vfill
+
+For more complicated models, `kppm` can be used for clustering behavior.
+
+\vfill
+
+
+## Now lets fit our simulated data
+
+```{r}
+sim_model <- ppm(pp ~ x + y);
+sim_model
+plot(sim_model)
+```
+
+
+### Marked Point Patterns
+\vfill
+Marked point process data contains meta data for each point. Rather than just $\boldsymbol{s}$, we have $(\boldsymbol{s},m)$.
+\vfill
+
+The marked information can either be categorical (multi-type) or continuous.
+
+\vfill
+
+The `lansing` data set contains locations of six types of trees.
+```{r, fig.width=7, fig.height = 5}
+plot(lansing, cols = 1:6)
+```
+
+```{r, fig.width=7, fig.height = 5}
+plot(split(lansing))
+```
+
+\newpage
+
+To analyze this data, consider the following model.
+\vfill
+```{r}
+lansing.model <- ppm(lansing ~  marks - 1)
+lansing.model
+```
+
+\vfill
+
+In contrast with this model, we can also include 
+
+```{r}
+lansing.model2 <- ppm(lansing ~  marks * polynom(x,y,3))
+#lansing.model2
+plot(lansing.model2)
+```
+\vfill
+
+Similarly continuous marked data can be included as a predictor i the `ppm` framework, potentially with interactions with spatially referenced data.
+
+\vfill
+
+Marked point process data can also be used for spatial-temporal point patterns, where the year corresponds to the mark.
+\vfill
+
+
+\newpage
+
+### More advanced point pattern models
+
+##### Cluster processes
+Clustering is not well defined. In general the idea is that the point distances are shorter than expected. However, there "is a fundamental ambiguity between heterogeneity and clustering" (Diggle 2007).
+\vfill
+
+__Neyman-Scott Process__: This is a two stage process. 
+
+\vfill
+1. Generate parents 
+\vfill
+2. For each parent, generate a set of offspring
+\vfill
+
+__The shot noise processes__ are variations on the Neyman-Scott process, also with a two stage process.
+
+\vfill
+
+__Strauss Process__: contains a term that allows repulsion by adjusting the intensity in a vicinity of an existing point. The "hardcore" process will make the intensity 0 for any pair of points less than a specified distance $d_0$.
+\vfill
+
